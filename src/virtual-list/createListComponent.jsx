@@ -65,7 +65,7 @@ const createListComponent = ({
 
     onScroll = (event) => {
       const { scrollTop } = event.currentTarget;
-      this.setState({ scrollOffset: scrollTop });
+      this.setState({ scrollOffset: Math.min(scrollTop, 20000000) });
     }
     getRangeToRender = () => {
       const { scrollOffset } = this.state;
@@ -98,27 +98,39 @@ const createListComponent = ({
     render() {
       const { width, height, itemCount, children: Row, isDynamic } = this.props;
       const containerStyle = { position: 'relative', width, height, overflow: 'auto', willChange: 'transform' };
-      const contentStyle = { width: '100%', height: getEstimatedTotalSize(this.props, this.instanceProps) };
+      const actuallyTotalHeight = getEstimatedTotalSize(this.props, this.instanceProps);
+      const isBeyondLimitedHeight = actuallyTotalHeight > 20000000;
+      const contentStyle = { width: '100%', height: isBeyondLimitedHeight ? 20000000 : actuallyTotalHeight };
       const items = [];
+      const ratio = isBeyondLimitedHeight ? actuallyTotalHeight / 20000000 : 1;
       if (itemCount > 0) {
         const [startIndex, stopIndex, originStartIndex, originStopIndex] = this.getRangeToRender();
+        // 放大后的开始索引
+        const scaleStartIndex = Math.ceil(startIndex * ratio);
+        let diff = scaleStartIndex - startIndex;
+        // 放大后的结束索引
+        const scaleEndIndex = stopIndex + diff;
+        // 放大后的结束索引若超过了总索引，那么diff就要减去超过的值，免得越界
+        const shouldFixCount = scaleEndIndex - (itemCount - 1);
+        if (shouldFixCount > 0) diff -= shouldFixCount;
         for (let index = startIndex; index <= stopIndex; index++) {
+          const correctItemIndex = index + diff;
           if (isDynamic) {
             items.push(
-              <ListItem key={index} index={index} style={this.getItemStyle(index)} ComponentType={Row} onSizeChange={this.onSizeChange} />
+              <ListItem key={index} index={correctItemIndex} style={this.getItemStyle(index)} ComponentType={Row} onSizeChange={this.onSizeChange} />
             );
           } else {
             if (index === originStartIndex) {
               items.push(
-                <Row key={index} index={index} style={this.getItemStyle(index)} />
+                <Row key={index} index={correctItemIndex} style={this.getItemStyle(index)} />
               );
             } else if (index === originStopIndex) {
               items.push(
-                <Row key={index} index={index} style={this.getItemStyle(index)} />
+                <Row key={index} index={correctItemIndex} style={this.getItemStyle(index)} />
               );
             } else {
               items.push(
-                <Row key={index} index={index} style={this.getItemStyle(index)} />
+                <Row key={index} index={correctItemIndex} style={this.getItemStyle(index)} />
               )
             }
           }
